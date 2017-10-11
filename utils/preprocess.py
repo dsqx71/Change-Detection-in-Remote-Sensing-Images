@@ -5,8 +5,8 @@ from config import cfg
 def concat_patche():
 
     s = 960
-    data2015 = np.zeros(cfg.data.data_shape + (3,))
-    data2017 = np.zeros(cfg.data.data_shape + (3,))
+    data2015 = np.zeros(cfg.data.data_shape + [3])
+    data2017 = np.zeros(cfg.data.data_shape + [3])
 
     label2015 = np.zeros(cfg.data.data_shape)
     label2017 = np.zeros(cfg.data.data_shape)
@@ -43,10 +43,10 @@ def concat_patche():
             if (Label2015 is not None):
                 assert (np.abs(Label2015 - Label2017) > 0).any()
 
-    assert data2015.shape[:2] == cfg.data.data_shape
-    assert data2017.shape[:2] == cfg.data.data_shape
-    assert label2015.shape == cfg.data.data_shape
-    assert label2017.shape == cfg.data.data_shape
+    assert data2015.shape[:2] == tuple(cfg.data.data_shape)
+    assert data2017.shape[:2] == tuple(cfg.data.data_shape)
+    assert label2015.shape == tuple(cfg.data.data_shape)
+    assert label2017.shape == tuple(cfg.data.data_shape)
     assert np.abs(label2015 - label2017).any()
 
     return label2015, label2017

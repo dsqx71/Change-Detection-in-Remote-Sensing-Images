@@ -23,6 +23,6 @@ cfg.dirs.FILE_label2017 = './data/label/label2017.npy'
 
 ### data setting
 cfg.data = easydict.EasyDict()
-cfg.data.data_shape = tuple((5106, 15106))
+cfg.data.data_shape = 5106, 15106
 
 

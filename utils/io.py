@@ -26,9 +26,9 @@ def read_rawdata(FILE_2015=cfg.dirs.FILE_2015,
 
     im_cada = tiff.imread(FILE_cadastral2015)
 
-    assert im_2015.shape[:2] == cfg.data.data_shape
-    assert im_2015.shape[:2] == cfg.data.data_shape
-    assert im_2015.shape[:2] == cfg.data.data_shape
+    assert im_2015.shape[:2] == tuple(cfg.data.data_shape)
+    assert im_2015.shape[:2] == tuple(cfg.data.data_shape)
+    assert im_2015.shape[:2] == tuple(cfg.data.data_shape)
 
     return im_2015, im_2017, im_tiny, im_cada
 

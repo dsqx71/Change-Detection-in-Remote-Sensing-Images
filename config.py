@@ -19,7 +19,8 @@ cfg.dirs.FILE_2017patch_label = './data/mylabel_2017/'
 # Full labelled data
 cfg.dirs.FILE_label2015 = './data/label/label2015.npy'
 cfg.dirs.FILE_label2017 = './data/label/label2017.npy'
-
+cfg.dirs.PCA_img2015 = './data/pca_img2015.npy'
+cfg.dirs.PCA_img2017 = './data/pca_img2017.npy'
 
 ### data setting
 cfg.data = easydict.EasyDict()

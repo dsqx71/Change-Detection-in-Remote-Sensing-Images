@@ -1,4 +1,5 @@
 import easydict
+import numpy as np
 cfg = easydict.EasyDict()
 
 ### dirs
@@ -21,9 +22,17 @@ cfg.dirs.FILE_label2015 = './data/label/label2015.npy'
 cfg.dirs.FILE_label2017 = './data/label/label2017.npy'
 cfg.dirs.PCA_img2015 = './data/pca_img2015.npy'
 cfg.dirs.PCA_img2017 = './data/pca_img2017.npy'
+cfg.dirs.tiny_label = './data/tiny_label.npy'
+
+# checkpoint
+cfg.dirs.pretrain_model ='./pretrain_model/'
 
 ### data setting
 cfg.data = easydict.EasyDict()
 cfg.data.data_shape = 5106, 15106
+cfg.data.batch_shape = (1, 3, 128, 128)
+cfg.data.label_shape = (1, 128, 128)
+cfg.data.r = 64
+cfg.data.mean = np.array([103.939, 116.779, 123.68])
 
 

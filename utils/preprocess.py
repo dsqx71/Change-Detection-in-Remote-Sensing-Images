@@ -70,7 +70,11 @@ def pca_transform():
     tmp2015 = io.scale_percentile(tmp2015) * 255
     tmp2017 = io.scale_percentile(tmp2017) * 255
 
-    return tmp2015, tmp2017
+    label = (im_tiny > 0).astype(float)
+    label = label[:,:,0]
+    label[label == 0] = np.nan
+
+    return tmp2015, tmp2017, label
     
     
 if __name__ == '__main__':
@@ -79,10 +83,11 @@ if __name__ == '__main__':
     np.save(cfg.dirs.FILE_label2015, label2015)
     np.save(cfg.dirs.FILE_label2017, label2017)
 
-    pca_img2015, pca_img2017 = pca_transform()
+    pca_img2015, pca_img2017, tiny_label = pca_transform()
 
     np.save(cfg.dirs.PCA_img2015, pca_img2015)
     np.save(cfg.dirs.PCA_img2017, pca_img2017)
+    np.save(cfg.dirs.tiny_label, tiny_label)
 
     print('Positive sample in 2015 : %f' % ((label2015 == 1).sum() / float(label2015.size)))
     print('Positive sample in 2017 : %f' % ((label2017 == 1).sum() / float(label2017.size)))

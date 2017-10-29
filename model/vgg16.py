@@ -1,48 +1,68 @@
-from .sym_util import  *
+from .sym_util import *
 
-def siamese(data, name):
+def get_conv(name, data, num_filter, kernel, stride=(1,1), pad=(1,1), dilate=(1, 1), with_relu=True):
+
+    weight = get_variable(name=name+'_weight')
+    bias = get_variable(name=name+'_bias')
+
+    conv = mx.symbol.Convolution(name=name, data=data, num_filter=num_filter, kernel=kernel,
+                                 weight=weight, bias=bias,
+                                 stride=stride, pad=pad, dilate=dilate, no_bias=False)
 
 
-    # Sharing weights
-    w1_1 = get_variable(name="conv1_1")
-    w1_2 = get_variable(name="conv1_2")
-    w2_1 = get_variable(name="conv2_1")
-    w2_2 = get_variable(name="conv2_2")
-    w3_1 = get_variable(name="conv3_1")
-    w3_2 = get_variable(name="conv3_2")
-    w3_3 = get_variable(name="conv3_3")
+    return mx.sym.Activation(conv, act_type="relu") if with_relu else conv
+
+def siamese(data):
 
     # conv1
-    conv1_1 = mx.sym.Convolution(data=data, weight=w1_1, kernel=(3, 3), pad=(1, 1), num_filter=64)
-    relu1_1 = mx.sym.Activation(data=conv1_1, act_type="relu", name="relu1_1")
-    conv1_2 = mx.sym.Convolution(data=relu1_1, weight=w1_2, kernel=(3, 3), pad=(1, 1), num_filter=64, name="conv1_2")
-    relu1_2 = mx.sym.Activation(data=conv1_2, act_type="relu", name="relu1_2")
 
-    # conv2
-    conv2_1 = mx.sym.Convolution(data=relu1_2, weight=w2_1, kernel=(3, 3), pad=(1, 1), num_filter=128, name="conv2_1")
-    relu2_1 = mx.sym.Activation(data=conv2_1, act_type="relu", name="relu2_1")
-    conv2_2 = mx.sym.Convolution(data=relu2_1, weight=w2_2, kernel=(3, 3), pad=(1, 1), num_filter=128, name="conv2_2")
-    relu2_2 = mx.sym.Activation(data=conv2_2, act_type="relu", name="relu2_2")
+    conv1_1 = get_conv(data=data, kernel=(3, 3), pad=(1, 1), num_filter=64, name="conv1_1")
+    conv1 = conv1_2 = get_conv(data=conv1_1, kernel=(3, 3), pad=(1, 1), num_filter=64, name="conv1_2")
+    conv1_2 = mx.sym.Pooling(data=conv1_2, kernel=(2, 2), stride=(2, 2), pool_type="max", name="pool1")
+
+    # conv2s
+    conv2_1 = get_conv(data=conv1_2, kernel=(3, 3), pad=(1, 1), num_filter=128, name="conv2_1", dilate=(1, 1))
+    conv2 = conv2_2 = get_conv(data=conv2_1, kernel=(3, 3), pad=(1, 1), num_filter=128, name="conv2_2")
+    conv2_2 = mx.sym.Pooling(data=conv2_2, kernel=(2, 2), stride=(2, 2), pool_type="max", name="pool2")
 
     # conv3
-    conv3_1 = mx.sym.Convolution(data=relu2_2, weight=w3_1, kernel=(3, 3), pad=(1, 1), num_filter=256, name="conv3_1")
-    relu3_1 = mx.sym.Activation(data=conv3_1, act_type="relu", name="relu3_1")
-    conv3_2 = mx.sym.Convolution(data=relu3_1, weight=w3_2, kernel=(3, 3), pad=(1, 1), num_filter=256, name="conv3_2")
-    relu3_2 = mx.sym.Activation(data=conv3_2, act_type="relu", name="relu3_2")
-    conv3_3 = mx.sym.Convolution(data=relu3_2, weight=w3_3, kernel=(3, 3), pad=(1, 1), num_filter=256, name="conv3_3")
-    relu3_3 = mx.sym.Activation(data=conv3_3, act_type="relu", name="relu3_3")
+    conv3_1 = get_conv(data=conv2_2, kernel=(3, 3), pad=(1, 1), num_filter=256, name="conv3_1", dilate=(1, 1))
+    conv3_2 = get_conv(data=conv3_1, kernel=(3, 3), pad=(1, 1), num_filter=256, name="conv3_2", dilate=(1 ,1))
+    conv3 = conv3_3 = get_conv(data=conv3_2, kernel=(3, 3), pad=(1, 1), num_filter=256, name="conv3_3")
+    conv3_3 = mx.sym.Pooling(data=conv3_3, kernel=(2, 2), stride=(2, 2), pool_type="max", name="pool3")
 
-    return relu3_3
+    # conv4
+    conv4_1 = get_conv(data=conv3_3, kernel=(3, 3), pad=(1, 1), num_filter=512, name="conv4_1", dilate=(1, 1))
+    conv4_2 = get_conv(data=conv4_1, kernel=(3, 3), pad=(1, 1), num_filter=512, name="conv4_2", dilate=(1, 1))
+    conv4 = conv4_3 = get_conv(data=conv4_2, kernel=(3, 3), pad=(1, 1), num_filter=512, name="conv4_3")
+    conv4_3 = mx.sym.Pooling(data=conv4_3, kernel=(2, 2), stride=(2, 2), pool_type="max", name="pool4")
+
+    # conv5
+    conv5_1 = get_conv(data=conv4_3, kernel=(3, 3), pad=(16, 16), num_filter=512, name="conv5_1", dilate=(16, 16))
+    conv5_2 = get_conv(data=conv5_1, kernel=(3, 3), pad=(16, 16), num_filter=512, name="conv5_2", dilate=(16, 16))
+    conv5_3 = get_conv(data=conv5_2, kernel=(3, 3), pad=(1, 1), num_filter=512, name="conv5_3")
+
+    b5 = mx.sym.UpSampling(data=conv5_3, scale=16, num_filter=512, num_args=1, sample_type='bilinear')
+    b4 = mx.sym.UpSampling(data=conv4, scale=8, num_filter=512, num_args=1, sample_type='bilinear')
+    b3 = mx.sym.UpSampling(data=conv3, scale=4, num_filter=256, num_args=1, sample_type='bilinear')
+    b2 = mx.sym.UpSampling(data=conv2, scale=2, num_filter=128, num_args=1, sample_type='bilinear')
+
+
+    ret = mx.sym.concat(conv1, b2, b3, b4, b5)
+
+    return ret
+
 
 
 def Vgg16_siamese():
 
     img1 = mx.sym.Variable('img1')
     img2 = mx.sym.Variable('img2')
+    label = mx.sym.Variable('label')
 
-    out1 = siamese(img1, 'img1')
-    out2 = siamese(img2, 'img2')
+    out1 = siamese(img1)
+    out2 = siamese(img2)
     
-    net = mx.sym.sum(out1 * out2, axis=1)
-
-    return net
+    data= mx.sym.sqrt(mx.sym.sum(mx.sym.square(out1 - out2), axis=1))
+    loss = mx.symbol.Custom(data=data, label=label, name='L1_sparse', loss_scale=1.0, is_l1=True, op_type='SparseRegressionLoss')
+    return loss

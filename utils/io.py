@@ -29,3 +29,10 @@ def read_rawdata(FILE_2015=cfg.dirs.FILE_2015,
 
     return im_2015, im_2017, im_tiny, im_cada
 
+def read_data():
+
+    pca_img2015 = np.load(cfg.dirs.PCA_img2015)
+    pca_img2017 = np.load(cfg.dirs.PCA_img2017)
+    tiny_label = np.load(cfg.dirs.tiny_label)
+
+    return pca_img2015, pca_img2017, tiny_label

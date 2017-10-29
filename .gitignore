@@ -115,3 +115,5 @@ data/*
 # paras
 *.params
 *.json
+
+src.tar.gz

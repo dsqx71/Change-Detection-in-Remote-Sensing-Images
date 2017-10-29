@@ -1,5 +1,6 @@
 import numpy as np
 import tifffile as tiff
+import random
 from config import cfg
 
 def scale_percentile(matrix):
@@ -36,3 +37,38 @@ def read_data():
     tiny_label = np.load(cfg.dirs.tiny_label)
 
     return pca_img2015, pca_img2017, tiny_label
+
+def sample_label(pca_img2015, pca_img2017, label, num_pos, num_neg):
+
+    data = []
+    labeled_points = np.argwhere(label == label)
+    explore = [(random.randint(cfg.data.r, label.shape[0] - cfg.data.r),
+                random.randint(cfg.data.r, label.shape[1] - cfg.data.r)) for i in range(num_neg+100)]
+    rnd_range = [i for i in range(labeled_points.shape[0])]
+    random.shuffle(rnd_range)
+    rnd_range = rnd_range[:num_pos] + explore
+    count = 0
+
+    for i in rnd_range:
+
+        if type(i) == int:
+            rnd_y = random.randint(-cfg.data.r + 20, cfg.data.r - 20)
+            rnd_x = random.randint(-cfg.data.r + 20, cfg.data.r - 20)
+            y, x = labeled_points[i]
+            y += rnd_y
+            x += rnd_x
+        else:
+            y, x = i
+
+        img1_patch = pca_img2015[y - cfg.data.r:y + cfg.data.r, x - cfg.data.r:x + cfg.data.r]
+        img2_patch = pca_img2017[y - cfg.data.r:y + cfg.data.r, x - cfg.data.r:x + cfg.data.r]
+        label_patch = label[y - cfg.data.r:y + cfg.data.r, x - cfg.data.r:x + cfg.data.r]
+
+        if img1_patch.size == 3 * cfg.data.batch_shape[2] ** 2:
+            data.append([img1_patch, img2_patch, label_patch, y, x])
+            count += 1
+
+        if count == num_neg + num_pos:
+            break
+
+    return data

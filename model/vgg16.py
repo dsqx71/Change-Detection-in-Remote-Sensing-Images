@@ -15,7 +15,6 @@ def get_conv(name, data, num_filter, kernel, stride=(1,1), pad=(1,1), dilate=(1,
 def siamese(data):
 
     # conv1
-
     conv1_1 = get_conv(data=data, kernel=(3, 3), pad=(1, 1), num_filter=64, name="conv1_1")
     conv1 = conv1_2 = get_conv(data=conv1_1, kernel=(3, 3), pad=(1, 1), num_filter=64, name="conv1_2")
     conv1_2 = mx.sym.Pooling(data=conv1_2, kernel=(2, 2), stride=(2, 2), pool_type="max", name="pool1")
@@ -47,14 +46,13 @@ def siamese(data):
     b3 = mx.sym.UpSampling(data=conv3, scale=4, num_filter=256, num_args=1, sample_type='bilinear')
     b2 = mx.sym.UpSampling(data=conv2, scale=2, num_filter=128, num_args=1, sample_type='bilinear')
 
-
     ret = mx.sym.concat(conv1, b2, b3, b4, b5)
 
     return ret
 
 
 
-def Vgg16_siamese():
+def Vgg16_siamese(ratio_neg=50):
 
     img1 = mx.sym.Variable('img1')
     img2 = mx.sym.Variable('img2')
@@ -63,6 +61,7 @@ def Vgg16_siamese():
     out1 = siamese(img1)
     out2 = siamese(img2)
     
-    data= mx.sym.sqrt(mx.sym.sum(mx.sym.square(out1 - out2), axis=1))
-    loss = mx.symbol.Custom(data=data, label=label, name='L1_sparse', loss_scale=1.0, is_l1=True, op_type='SparseRegressionLoss')
+    data= mx.sym.sqrt(mx.sym.sum(mx.sym.square(out1 - out2), axis=1, keepdims=True))
+    loss = mx.symbol.Custom(data=data, label=label, name='L1_sparse', loss_scale=1.0, is_l1=True, ratio_neg=ratio_neg, op_type='SparseRegressionLoss')
+
     return loss

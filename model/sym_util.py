@@ -2,6 +2,7 @@ import mxnet as mx
 import numpy as np
 
 var_registrar = {}
+
 def get_variable(name, shape=None, init=None):
     global var_registrar
     if name not in var_registrar:
@@ -13,13 +14,13 @@ class SparseRegressionLoss(mx.operator.CustomOp):
     """
         SparseRegressionLoss will ignore labels with values of NaN
     """
-    def __init__(self,loss_scale, is_l1):
+    def __init__(self,loss_scale, is_l1, ratio_neg):
         # due to mxnet serialization problem
         super(SparseRegressionLoss, self).__init__()
-        loss_scale = float(loss_scale)
-        is_l1 = bool(is_l1)
-        self.loss_scale = loss_scale
-        self.is_l1 = is_l1
+
+        self.loss_scale = float(loss_scale)
+        self.is_l1 = bool(is_l1)
+        self.ratio_neg = float(ratio_neg)
 
     def forward(self, is_train, req, in_data, out_data, aux):
 
@@ -31,8 +32,13 @@ class SparseRegressionLoss(mx.operator.CustomOp):
 
         label = in_data[1].asnumpy()
         y = out_data[0].asnumpy()
+
+        # find negative samples
+        mask_neg = (label == 0)
+
         # find invalid labels
         mask_nan = (label != label)
+
         # total number of valid points
         normalize_coeff = (~mask_nan[:, 0, :, :]).sum()
         if self.is_l1:
@@ -45,16 +51,18 @@ class SparseRegressionLoss(mx.operator.CustomOp):
         if normalize_coeff == 0:
             tmp[:] = 0
 
+        tmp[mask_neg] = self.ratio_neg * tmp[mask_neg]
         self.assign(in_grad[0], req[0], mx.nd.array(tmp))
 
 
 @mx.operator.register("SparseRegressionLoss")
 class SparseRegressionLossProp(mx.operator.CustomOpProp):
 
-    def __init__(self, loss_scale, is_l1):
+    def __init__(self, loss_scale, is_l1, ratio_neg=1):
         super(SparseRegressionLossProp, self).__init__(False)
         self.loss_scale = loss_scale
         self.is_l1 = is_l1
+        self.ratio_neg = ratio_neg
 
     def list_arguments(self):
         return ['data', 'label']
@@ -71,4 +79,4 @@ class SparseRegressionLossProp(mx.operator.CustomOpProp):
 
     def create_operator(self, ctx, shapes, dtypes):
 
-        return SparseRegressionLoss(self.loss_scale, self.is_l1)
+        return SparseRegressionLoss(self.loss_scale, self.is_l1, self.ratio_neg)

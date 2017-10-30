@@ -1,6 +1,5 @@
 from config import cfg
 from utils import io, misc
-
 import matplotlib.pyplot as plt
 from collections import namedtuple
 from model import vgg16
@@ -9,8 +8,6 @@ import numpy as np
 
 plt.rcParams['figure.figsize'] = (10, 20)
 
-for i in cfg.dirs:
-    cfg.dirs[i] = 'oss://satellite-xudong.oss-cn-beijing-internal.aliyuncs.com/' + cfg.dirs[i][2:]
 
 # Load data
 print ("Loading data...")

@@ -1,7 +1,7 @@
 import numpy as np
-import tifffile as tiff
 import random
 from config import cfg
+import tifffile as tiff
 
 def scale_percentile(matrix):
     w, h, d = matrix.shape

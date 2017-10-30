@@ -1,8 +1,10 @@
 import cv2
 import numpy as np
-from . import io
 from config import cfg
 from sklearn.decomposition import PCA
+
+from . import io
+
 
 def concat_patche():
 

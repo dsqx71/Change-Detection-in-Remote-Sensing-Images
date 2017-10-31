@@ -1,0 +1,1 @@
+python main.py --model vgg16 --ratio 5 --lr 1e-5 --t1 1000 --t2 15000 --epoch 0

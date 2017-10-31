@@ -1,6 +1,8 @@
 import mxnet as mx
 import subprocess
+import os
 from config import cfg
+from sklearn.metrics import f1_score, accuracy_score
 
 def load_checkpoint(prefix, epoch):
     save_dict = mx.nd.load('%s-%04d.params' % (prefix, epoch))
@@ -18,7 +20,7 @@ def load_pretrainModel(name, net):
     # Load pretrained model
     arg_name = net.list_arguments()
     aux_name = net.list_auxiliary_states()
-    pretrain_args, pretrain_auxs = load_checkpoint(cfg.dirs.pretrain_model + name, 0)
+    pretrain_args, pretrain_auxs = load_checkpoint(os.path.join(cfg.dirs.pretrain_model,name), 0)
 
     args = {}
     auxs = {}
@@ -41,3 +43,25 @@ def get_gpus():
     except OSError:
         return []
     return range(len([i for i in re.split('\n') if 'GPU' in i]))
+
+
+def F1_score(pred, gt):
+
+    mask = pred == pred
+    val_pred = pred[mask]
+    val_gt = gt[mask]
+    score = f1_score(val_gt, val_pred, average='binary')
+    density = mask.sum() / float(gt.size)
+
+    return score, density
+
+
+def accuracy(pred, gt):
+
+    mask = pred == pred
+    val_pred = pred[mask]
+    val_gt = gt[mask]
+
+    score = accuracy_score(val_gt, val_pred)
+
+    return score

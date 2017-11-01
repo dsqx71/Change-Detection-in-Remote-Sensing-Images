@@ -58,8 +58,8 @@ class SparseRegressionLoss(mx.operator.CustomOp):
                 tmp[:] = 0
             else:
                 tmp[mask_neg] = mask_pos.size / mask_neg.size * tmp[mask_neg]
-        else:
-            tmp[mask_neg] = self.ratio_neg * tmp[mask_neg]
+
+        tmp[mask_neg] = self.ratio_neg * tmp[mask_neg]
         self.assign(in_grad[0], req[0], mx.nd.array(tmp))
 
 

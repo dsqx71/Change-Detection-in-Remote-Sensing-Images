@@ -20,7 +20,6 @@ if __name__ == '__main__':
     parser.add_argument('--t1', type=float, default=0.05)
     parser.add_argument('--t2', type=float, default=0.999)
     parser.add_argument('--opt', type=str, default='sgd', choices=['sgd', 'Adam'])
-    parser.add_argument('--num_train', type=int, default=100)
     args = parser.parse_args()
 
     # logging
@@ -118,7 +117,7 @@ if __name__ == '__main__':
         flag_n = False
 
         # E-step
-        samples = io.sample_label(pca_img2015, pca_img2017, label, 100, 100)
+        samples = io.sample_label(pca_img2015, pca_img2017, label, 100, 400)
 
         for i in range(len(samples)):
             dbatch = DataBatch(data=[mx.nd.array(np.expand_dims(samples[i][0], 0).transpose(0, 3, 1, 2)),
@@ -131,17 +130,17 @@ if __name__ == '__main__':
             if (samples[i][2] == samples[i][2]).any():
 
                 if (out[samples[i][2] == 1].size > 0):
-                    minm_p = min(np.percentile(out[samples[i][2] == 1], 10), minm_p)
-                    maxm_p = max(np.percentile(out[samples[i][2] == 1], 95), maxm_p)
+                    minm_p = min(out[samples[i][2] == 1].min(), minm_p)
+                    maxm_p = max(out[samples[i][2] == 1].max(), maxm_p)
                     count_p += 1
 
                 if (out[samples[i][2] == 0].size > 0):
                     # print(np.argmin(out))
-                    minm_n = min(np.percentile(out[samples[i][2] == 0], 10), minm_n)
-                    maxm_n = max(np.percentile(out[samples[i][2] == 0], 95), maxm_n)
+                    minm_n = min(out[samples[i][2] == 0].min(), minm_n)
+                    maxm_n = max(out[samples[i][2] == 0].max(), maxm_n)
                     count_n += 1
 
-            if count_p >= 50:
+            if count_p >= 30:
                 # Label those data with negative class
                 mask1 = (out < args.t1 * minm_p) & (samples[i][2] != samples[i][2])
                 samples[i][2][mask1] = 0
@@ -155,7 +154,7 @@ if __name__ == '__main__':
                 if mask2.size > 0:
                     flag_p = True
 
-            if i % 100 == 0 and i!=0:
+            if i % 200 == 0:
                 logging.info('minm_p:{}, maxm_p:{}, minm_n:{}, maxm_n:{}, positive class: {}, negative class: {}'.format(minm_p, maxm_p, minm_n, maxm_n, (label == 1).sum(), (label == 0).sum()))
 
         # M-step
@@ -186,14 +185,3 @@ if __name__ == '__main__':
             args.t2 -= 0.01
             logging.info("update t2:{}".format(args.t2))
 
-
-    # Training
-    for k in range(args.num_train):
-        samples = io.sample_label(pca_img2015, pca_img2017, label, 200, 0)
-        for i in range(len(samples)):
-            if ((samples[i][2] == samples[i][2]).any() and (count_p > 0 or count_n > 0)):
-                dbatch = DataBatch(data=[mx.nd.array(np.expand_dims(samples[i][0], 0).transpose(0, 3, 1, 2)),
-                                         mx.nd.array(np.expand_dims(samples[i][1], 0).transpose(0, 3, 1, 2))],
-                                   label=[mx.nd.array([np.expand_dims(samples[i][2], 0)])])
-                mod.forward_backward(dbatch)
-                mod.update()

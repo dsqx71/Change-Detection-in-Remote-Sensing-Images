@@ -20,7 +20,6 @@ if __name__ == '__main__':
     parser.add_argument('--t1', type=float, default=0.05)
     parser.add_argument('--t2', type=float, default=0.999)
     parser.add_argument('--opt', type=str, default='sgd', choices=['sgd', 'Adam'])
-    parser.add_argument('--num_train', type=int, default=100)
     args = parser.parse_args()
 
     # logging
@@ -132,13 +131,13 @@ if __name__ == '__main__':
 
                 if (out[samples[i][2] == 1].size > 0):
                     minm_p = min(np.percentile(out[samples[i][2] == 1], 10), minm_p)
-                    maxm_p = max(np.percentile(out[samples[i][2] == 1], 95), maxm_p)
+                    maxm_p = max(np.percentile(out[samples[i][2] == 1], 90), maxm_p)
                     count_p += 1
 
                 if (out[samples[i][2] == 0].size > 0):
                     # print(np.argmin(out))
                     minm_n = min(np.percentile(out[samples[i][2] == 0], 10), minm_n)
-                    maxm_n = max(np.percentile(out[samples[i][2] == 0], 95), maxm_n)
+                    maxm_n = max(np.percentile(out[samples[i][2] == 0], 90), maxm_n)
                     count_n += 1
 
             if count_p >= 50:
@@ -186,14 +185,3 @@ if __name__ == '__main__':
             args.t2 -= 0.01
             logging.info("update t2:{}".format(args.t2))
 
-
-    # Training
-    for k in range(args.num_train):
-        samples = io.sample_label(pca_img2015, pca_img2017, label, 200, 0)
-        for i in range(len(samples)):
-            if ((samples[i][2] == samples[i][2]).any() and (count_p > 0 or count_n > 0)):
-                dbatch = DataBatch(data=[mx.nd.array(np.expand_dims(samples[i][0], 0).transpose(0, 3, 1, 2)),
-                                         mx.nd.array(np.expand_dims(samples[i][1], 0).transpose(0, 3, 1, 2))],
-                                   label=[mx.nd.array([np.expand_dims(samples[i][2], 0)])])
-                mod.forward_backward(dbatch)
-                mod.update()

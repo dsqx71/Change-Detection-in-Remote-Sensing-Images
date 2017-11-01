@@ -20,4 +20,6 @@
 
 
 #### Usage
+```python
 python main.py --model vgg16 --opt sgd --lr 1e-5 --t1 0.2 --t2 0.99 --epoch 0 --num_epoch 100
+```

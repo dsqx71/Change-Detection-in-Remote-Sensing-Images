@@ -14,13 +14,14 @@ class SparseRegressionLoss(mx.operator.CustomOp):
     """
         SparseRegressionLoss will ignore labels with values of NaN
     """
-    def __init__(self,loss_scale, is_l1, ratio_neg):
+    def __init__(self,loss_scale, is_l1, adaptive, ratio_neg):
         # due to mxnet serialization problem
         super(SparseRegressionLoss, self).__init__()
 
         self.loss_scale = float(loss_scale)
         self.is_l1 = bool(is_l1)
         self.ratio_neg = float(ratio_neg)
+        self.adaptive = bool(adaptive)
 
     def forward(self, is_train, req, in_data, out_data, aux):
 
@@ -51,18 +52,26 @@ class SparseRegressionLoss(mx.operator.CustomOp):
         if normalize_coeff == 0:
             tmp[:] = 0
 
-        tmp[mask_neg] = self.ratio_neg * tmp[mask_neg]
+        if self.adaptive:
+            mask_pos = (label==1)
+            if mask_pos.size == 0 or mask_neg.size == 0:
+                tmp[:] = 0
+            else:
+                tmp[mask_neg] = mask_pos.size / mask_neg.size * tmp[mask_neg]
+        else:
+            tmp[mask_neg] = self.ratio_neg * tmp[mask_neg]
         self.assign(in_grad[0], req[0], mx.nd.array(tmp))
 
 
 @mx.operator.register("SparseRegressionLoss")
 class SparseRegressionLossProp(mx.operator.CustomOpProp):
 
-    def __init__(self, loss_scale, is_l1, ratio_neg=1):
+    def __init__(self, loss_scale, is_l1, adaptive=False, ratio_neg=1):
         super(SparseRegressionLossProp, self).__init__(False)
         self.loss_scale = loss_scale
         self.is_l1 = is_l1
         self.ratio_neg = ratio_neg
+        self.adaptive = adaptive
 
     def list_arguments(self):
         return ['data', 'label']
@@ -79,4 +88,4 @@ class SparseRegressionLossProp(mx.operator.CustomOpProp):
 
     def create_operator(self, ctx, shapes, dtypes):
 
-        return SparseRegressionLoss(self.loss_scale, self.is_l1, self.ratio_neg)
+        return SparseRegressionLoss(self.loss_scale, self.is_l1, self.adaptive, self.ratio_neg)

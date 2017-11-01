@@ -18,13 +18,13 @@ if __name__ == '__main__':
     parser.add_argument('--epoch', type=int, help='continue training', default=0)
     parser.add_argument('--lr', type=float, help='Learning rate', default=1e-5)
     parser.add_argument('--num_epoch', type=int, default=100)
-    parser.add_argument('--t1', type=float, default=0.7)
-    parser.add_argument('--t2', type=float, default=10)
-    parser.add_argument('--ratio', type=float, default=5)
+    parser.add_argument('--t1', type=float, default=0.010)
+    parser.add_argument('--t2', type=float, default=0.999)
+    parser.add_argument('--opt', type=str, default='sgd', choices=['sgd', 'Adam'])
     args = parser.parse_args()
 
     # logging
-    exp_name = '_'.join([args.model, str(args.ratio), str(args.t1), str(args.t2)])
+    exp_name = '_'.join([args.model, str(args.opt), str(args.t1), str(args.t2)])
     log_file = os.path.join(cfg.dirs.log_prefix, exp_name)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s  %(message)s', filename=log_file, filemode='a')
     console = logging.StreamHandler()
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         os.makedirs(checkpoint_prefix)
 
     # Init executor
-    net = eval('{}.{}'.format(args.model, args.model))(ratio_neg=args.ratio)
+    net = eval('{}.{}'.format(args.model, args.model))(ratio_neg=1)
     fix_params = [item for item in net.list_arguments() if 'upsampling' in item]
     if args.epoch == 0:
         # Load pretrain model
@@ -65,19 +65,39 @@ if __name__ == '__main__':
         mod.init_params(initializer=init, arg_params=pretrain_args, aux_params=pretrain_auxs    ,
                         allow_missing=True, force_init=False)
     else:
-        mod = mx.module.Module.load(checkpoint_prefix)
+        mod = mx.module.Module.load(prefix=checkpoint_path,
+                                    epoch=args.epoch,
+                                    load_optimizer_states=True,
+                                    data_names=['img1', 'img2'],
+                                    label_names=['label', ],
+                                    context=mx.gpu(0),
+                                    fixed_param_names=fix_params)
+        mod.bind(data_shapes=[('img1', cfg.data.batch_shape), ('img2', cfg.data.batch_shape)],
+                 label_shapes=[('label', cfg.data.label_shape)],
+                 for_training=True, force_rebind=False)
+        label = np.load(checkpoint_path + '_predict_{}'.format(args.epoch))
+        a,b = mod.get_params()
+        for key in a:
+            assert (a[key].asnumpy() !=0).any()
 
+
+    if args.opt =='sgd':
+        optimizer_params = dict(learning_rate=args.lr,
+                                wd=0.0004,
+                                momentum=0.90)
+    else:
+        optimizer_params = dict(learning_rate=args.lr,
+                                beta1=0.90,
+                                beta2=0.999,
+                                epsilon=1e-4,
+                                rescale_grad=1.0 / cfg.data.batch_shape[0],
+                                wd=0.0004,
+                                lr_scheduler=mx.lr_scheduler.FactorScheduler(step=250000,
+                                                                             factor=0.5,
+                                                                             stop_factor_lr=3.125E-6))
     mod.init_optimizer(kvstore='device',
-                       optimizer='Adam',
-                       optimizer_params=dict(learning_rate=args.lr,
-                                             beta1=0.90,
-                                             beta2=0.999,
-                                             epsilon=1e-4,
-                                             rescale_grad=1.0 / cfg.data.batch_shape[0],
-                                             wd=0.0004,
-                                             lr_scheduler=mx.lr_scheduler.FactorScheduler(step=250000,
-                                                                                          factor=0.5,
-                                                                                          stop_factor_lr=3.125E-6)))
+                       optimizer=args.opt,
+                       optimizer_params=optimizer_params)
 
     # EM
     print ("EM alogtihm")
@@ -94,8 +114,10 @@ if __name__ == '__main__':
         maxm_n = -np.inf
         count_n = 0
 
+        flag = False
+
         # E-step
-        samples = io.sample_label(pca_img2015, pca_img2017, label, 300, 1700)
+        samples = io.sample_label(pca_img2015, pca_img2017, label, 1000, 2000)
 
         for i in range(len(samples)):
             dbatch = DataBatch(data=[mx.nd.array(np.expand_dims(samples[i][0], 0).transpose(0, 3, 1, 2)),
@@ -117,14 +139,16 @@ if __name__ == '__main__':
                     maxm_n = max(out[samples[i][2] == 0].max(), maxm_n)
                     count_n += 1
 
-            if count_p >= 100:
+            if count_p >= 400:
                 # Label those data with negative class
-                mask1 = (out < minm_p * args.t1) & (samples[i][2] != samples[i][2])
+                mask1 = (out < args.t1 * minm_p) & (samples[i][2] != samples[i][2])
                 samples[i][2][mask1] = 0
 
                 # Label those data with positive class
-                mask2 = (out > minm_p * args.t2) & (samples[i][2] != samples[i][2])
+                mask2 = (out > args.t2 * maxm_p) & (samples[i][2] != samples[i][2])
                 samples[i][2][mask2] = 1
+                if mask1.size > 0 or mask2.size > 0:
+                    flag = True
 
             if i % 200 == 0:
                 logging.info('minm_p:{}, maxm_p:{}, minm_n:{}, maxm_n:{}, positive class: {}, negative class: {}'.format(minm_p, maxm_p, minm_n, maxm_n, (label == 1).sum(), (label == 0).sum()))
@@ -135,17 +159,20 @@ if __name__ == '__main__':
             if ((samples[i][2] == samples[i][2]).any() and (count_p > 0 or count_n > 0)):
                 dbatch = DataBatch(data=[mx.nd.array(np.expand_dims(samples[i][0], 0).transpose(0, 3, 1, 2)),
                                          mx.nd.array(np.expand_dims(samples[i][1], 0).transpose(0, 3, 1, 2))],
-                                   label=[mx.nd.array([np.expand_dims(samples[i][2], 0) * maxm_p])])
+                                   label=[mx.nd.array([np.expand_dims(samples[i][2], 0)])])
                 mod.forward_backward(dbatch)
                 mod.update()
 
-        # if k % 10 == 0:
+        # Save checkpoint and result
         mod.save_checkpoint(prefix=checkpoint_path, epoch=k, save_optimizer_states=True)
-
+        np.save(checkpoint_path + '_predict_{}'.format(k), label)
 
         # Evaluation
         score, density = misc.F1_score(label, gt)
         acc = misc.accuracy(label, gt)
         logging.info("Epoch : %d, F1-score : %.4f, accuracy: %.4f, Density : %.4f" %(k, score, acc, density))
 
-    mod.save_checkpoint(prefix=checkpoint_path, epoch=k, save_optimizer_states=True)
+        if flag == False:
+            args.t1 += 0.05
+            args.t2 -= 0.01
+
